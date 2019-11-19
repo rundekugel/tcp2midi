@@ -13,31 +13,45 @@ import rtmidi
 import socketserver
 
 #global 
-midiout = None
+#midiout = None
 midiMsg = None
 
 class MidiMessage:
+  """
+  holds midi message and the midi obj. only sender until yet.
+  """
   data=[0]
   posWrite = 0
+  midiobj = None
+  
+  # STATUS_4ByteMsg 
+  # STATUS_3ByteMsg
+  
   def __init__(self):
     d0=0
   def status(self):
-    return (d[0]>>4) & 0b111
+    return (d[0]>>4) 
   def channel(self):
     return d[0] & 0xf
   def valid(self):
     return d[0] & 0x80 >0
-  def feed(self, byte):
+  def feed(self, data):
+    # if sys.version_info[0]==3:
+      # data = data.encode()
     if self.valid:
-      data.append(byte)
+      self.data.append(data)
     else:
-      if byte & 0x80:
-        data=[byte]
+      if data & 0x80:
+        self.data=[data]
       else:
-        data=[]
-    return len(data)
+        self.data=[]
+    return len(self.data)
   def reset(self):
     self.data=[]
+  def msgLen(self):
+    if self.status == 0xf:
+      return 4
+    else return 3
         
         
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -52,21 +66,21 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     # midiout = None
     
     def handle(self):
-        global midiout, midiMsg
+        global midiMsg
         # self.request is the TCP socket connected to the client
         self.data = self.request.recv(1)
         print("{} wrote:".format(self.client_address[0]))
         print(self.data)
         r = midiMsg.feed(self.data)
-        if r >= 4:
-          midiout.send_message(midiMsg.data)
+        if r and r>= midiMsg.msgLen():
+          midiMsg.midiobj.send_message(midiMsg.data[midiMsg[:midiMsg.msgLen())
         
         # just send back the same data, but upper-cased
         #self.request.sendall(self.data.upper())
 
-    def __init__(self):
-      print("init...")
-
+    # def __init__(self, p1=0,p2=0,p3=0,p4=0):
+      # print("init with %s, %s, %s, %s"%(str(p1), str(p2), str(p3), str(p4)) )
+      # super(socketserver.BaseRequestHandler, self).__init__()
     
 def usage():
   print("use with param -p to get list of ports.") 
@@ -77,8 +91,8 @@ def main():
     host,port = "localhost", 9999
 
     midiMsg = MidiMessage()
-    midiobj = rtmidi.MidiOut()
-    midiports = midiobj.get_ports()
+    midiMsg.midiobj = rtmidi.MidiOut()
+    midiports = midiMsg.midiobj.get_ports()
     midiportnum = 0
     
     le=len(sys.argv)
@@ -101,8 +115,7 @@ def main():
         n+=1
       print("Call %s with the desired portnumber from the list above."%sys.argv[0])
       return
-    midiout=midiports[midiportnum]
-    
+    midiMsg.midiobj.open_port(midiportnum)
       
     # Create the server, binding to localhost on port 9999
     with socketserver.TCPServer((host, port), MyTCPHandler) as server:
