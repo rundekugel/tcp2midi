@@ -28,30 +28,30 @@ class MidiMessage:
   # STATUS_3ByteMsg
   
   def __init__(self):
-    d0=0
+    self.reset()
   def status(self):
-    return (d[0]>>4) 
+    return (self.data[0]>>4)
   def channel(self):
-    return d[0] & 0xf
+    return self.data[0] & 0xf
   def valid(self):
-    return d[0] & 0x80 >0
+    return self.data[0] & 0x80 >0
   def feed(self, data):
     # if sys.version_info[0]==3:
       # data = data.encode()
-    if self.valid:
+    data = ord(data)
+    if self.valid():
       self.data.append(data)
     else:
       if data & 0x80:
         self.data=[data]
-      else:
-        self.data=[]
     return len(self.data)
   def reset(self):
-    self.data=[]
+    self.data=[0]
   def msgLen(self):
-    if self.status == 0xf:
+    if self.status() == 0xf:
       return 4
-    else return 3
+    else:
+      return 3
         
         
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -68,12 +68,14 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     def handle(self):
         global midiMsg
         # self.request is the TCP socket connected to the client
-        self.data = self.request.recv(1)
-        print("{} wrote:".format(self.client_address[0]))
-        print(self.data)
-        r = midiMsg.feed(self.data)
+        data = self.request.recv(1)
+        if not len(data):
+          return
+        #print("{} wrote:".format(self.client_address[0]))
+        #print(self.data)
+        r = midiMsg.feed(data)
         if r and r>= midiMsg.msgLen():
-          midiMsg.midiobj.send_message(midiMsg.data[midiMsg[:midiMsg.msgLen())
+          midiMsg.midiobj.send_message(midiMsg.data[:midiMsg.msgLen()])
         
         # just send back the same data, but upper-cased
         #self.request.sendall(self.data.upper())
