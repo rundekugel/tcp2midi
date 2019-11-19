@@ -5,7 +5,7 @@
 forwards tcp packets to midi-out
 """
 
-__author__  = gaul1@lifesim.de
+__author__  = "gaul1@lifesim.de"
 __version__ = "0.1"
 
 import sys
@@ -93,11 +93,13 @@ def main():
       if le >3:
         host = sys.argv[3]
     except:
-      print("List of Midi Ports")
+      print("List of Midi Ports:")
     #if sys.argv[1]=="-p":
       n=0
       for p in midiports:
         print("%d. %s"%(n, p.title()))
+        n+=1
+      print("Call %s with the desired portnumber from the list above."%sys.argv[0])
       return
     midiout=midiports[midiportnum]
     
