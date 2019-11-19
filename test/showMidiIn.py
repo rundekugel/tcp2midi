@@ -56,7 +56,10 @@ def usage():
   print("else: showMidiIn midiport")
 
 def midiInCB(tuple, data):
-  print(tuple)
+  #print(tuple)
+  m=tuple[0]
+  print("Status: %02x, Note: %02x, Acc: %02x  # %s"%(
+      m[0], m[1], m[2], str(tuple)))
 
 def main():
     # global  midiMsg
