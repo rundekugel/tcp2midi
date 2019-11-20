@@ -11,6 +11,7 @@ __version__ = "0.3"
 import sys
 import rtmidi
 import socketserver
+import os
 
 #global 
 #midiout = None
@@ -90,7 +91,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         if not len(data):
           if verbosity:
             print("tcp in: empty packet. Probably connection closed.")
-            self.onnected = 0
+            self.connected = 0
           return
         if data[:3]==b"-v=":
           try:
@@ -98,6 +99,10 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
             print("set verbosity to %d"%verbosity)
           except:
             pass
+        if data[:7]==b"-LPorts":
+          if verbosity:
+            print("Get MIDI dev. List")
+          self.request.sendall(listOfMidiPorts().encode())
         if verbosity>2:
           print("tcp in: " +str(data))
         for d in data:
@@ -120,16 +125,17 @@ def usage():
   print("else: -v=n set verbosity to n (0..5)")
 
 def listOfMidiPorts():
+  r=""
   midiMsg = MidiMessage()
   midiMsg.midiobj = rtmidi.MidiOut()
   midiports = midiMsg.midiobj.get_ports()
-  print("List of Midi Ports:")
+  r+="List of Midi Ports:"+os.linesep
   n = 0
   for p in midiports:
-    print("%d. %s" % (n, p.title()))
+    r+="%d. %s" % (n, p.title()) +os.linesep
     n += 1
-  print("Call %s with the desired portnumber from the list above." % sys.argv[0])
-  return
+  r+="----"+os.linesep
+  return r
 
 def main():
     global midiMsg, verbosity
