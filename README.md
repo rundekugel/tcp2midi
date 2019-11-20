@@ -2,7 +2,7 @@
 Forward MIDI messages from TCP/IP to MIDI interface
 
 use with:
-tcp2midi p [tcpportnumber [,local IP]]
+tcp2midi p [tcpportnumber [,local IP]]<br>
 p=midi port number
 
 
