@@ -6,7 +6,7 @@ forwards tcp packets to midi-out
 """
 
 __author__  = "gaul1@lifesim.de"
-__version__ = "0.2"
+__version__ = "0.3"
 
 import sys
 import rtmidi
@@ -15,6 +15,7 @@ import socketserver
 #global 
 #midiout = None
 midiMsg = None
+verbosity = 1
 
 class MidiMessage:
   """
@@ -29,24 +30,36 @@ class MidiMessage:
   
   def __init__(self):
     self.reset()
+
   def status(self):
     return (self.data[0]>>4)
+
   def channel(self):
     return self.data[0] & 0xf
+
   def valid(self):
     return self.data[0] & 0x80 >0
+
   def feed(self, data):
     # if sys.version_info[0]==3:
       # data = data.encode()
-    data = ord(data)
+    if isinstance(data, bytes):
+      data = ord(data[0])
     if self.valid():
       self.data.append(data)
     else:
       if data & 0x80:
         self.data=[data]
     return len(self.data)
+
+  def popMsg(self):
+    d= self.data[:midiMsg.msgLen()]
+    self.reset()
+    return d
+
   def reset(self):
     self.data=[0]
+
   def msgLen(self):
     if self.status() == 0xf:
       return 4
@@ -64,42 +77,76 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     """
     # midiMsg = None
     # midiout = None
-    
-    def handle(self):
-        global midiMsg
-        # self.request is the TCP socket connected to the client
-        data = self.request.recv(1)
-        if not len(data):
-          return
-        #print("{} wrote:".format(self.client_address[0]))
-        #print(self.data)
-        r = midiMsg.feed(data)
-        if r and r>= midiMsg.msgLen():
-          midiMsg.midiobj.send_message(midiMsg.data[:midiMsg.msgLen()])
-        
-        # just send back the same data, but upper-cased
-        #self.request.sendall(self.data.upper())
+    connected = 0
 
-    # def __init__(self, p1=0,p2=0,p3=0,p4=0):
-      # print("init with %s, %s, %s, %s"%(str(p1), str(p2), str(p3), str(p4)) )
-      # super(socketserver.BaseRequestHandler, self).__init__()
-    
+    def handle(self):
+        global midiMsg, verbosity
+        # self.request is the TCP socket connected to the client
+        if not self.connected:
+          self.connected = 1
+          if verbosity:
+            print("connection from: %s:%d to:%s:%d"%(self.client_address+self.server.server_address))
+        data = self.request.recv(999)
+        if not len(data):
+          if verbosity:
+            print("tcp in: empty packet. Probably connection closed.")
+            self.onnected = 0
+          return
+        if data[:3]==b"-v=":
+          try:
+            verbosity = int(data[3:])
+            print("set verbosity to %d"%verbosity)
+          except:
+            pass
+        if verbosity>2:
+          print("tcp in: " +str(data))
+        for d in data:
+          r = midiMsg.feed(d)
+          r2= r and r>= midiMsg.msgLen()
+          if r2:
+            m=midiMsg.popMsg()
+            midiMsg.midiobj.send_message(m)
+            if verbosity >2:
+              print("MIDI out: %s"%str(m))
+        return
+# endofclass
+
+
 def usage():
+  print("%s Version: %s by %s"%(sys.argv[0], __version__, __author__))
   print("use with param -p to get list of ports.") 
-  print("else: tcp2midi midiport [tcp-port [tcp-hostname]]") 
-    
+  print("else: tcp2midi midiport [tcp-port [tcp-hostname]]")
+  print("else: -V: get version")
+  print("else: -v=n set verbosity to n (0..5)")
+
+def listOfMidiPorts():
+  midiMsg = MidiMessage()
+  midiMsg.midiobj = rtmidi.MidiOut()
+  midiports = midiMsg.midiobj.get_ports()
+  print("List of Midi Ports:")
+  n = 0
+  for p in midiports:
+    print("%d. %s" % (n, p.title()))
+    n += 1
+  print("Call %s with the desired portnumber from the list above." % sys.argv[0])
+  return
+
 def main():
-    global midiout, midiMsg
+    global midiMsg, verbosity
     host,port = "localhost", 9999
 
     midiMsg = MidiMessage()
     midiMsg.midiobj = rtmidi.MidiOut()
     midiports = midiMsg.midiobj.get_ports()
     midiportnum = 0
+    verbosity=1
     
     le=len(sys.argv)
     if le <=1:
       usage()
+      return
+    if sys.argv[1]=="-V":
+      print("Version: %s"%__version__)
       return
     try:
       if le >1:
@@ -108,6 +155,9 @@ def main():
         port = int(sys.argv[2])
       if le >3:
         host = sys.argv[3]
+      for p in sys.argv:
+        if p[:3]=="-v=":
+          verbosity = int(p[3:])
     except:
       print("List of Midi Ports:")
     #if sys.argv[1]=="-p":
@@ -120,6 +170,8 @@ def main():
     midiMsg.midiobj.open_port(midiportnum)
       
     # Create the server, binding to localhost on port 9999
+    if verbosity:
+      print("Listening on ip:%s port:%d"%(host,port))
     with socketserver.TCPServer((host, port), MyTCPHandler) as server:
         # Activate the server; this will keep running until you
         # interrupt the program with Ctrl-C
