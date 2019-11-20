@@ -6,7 +6,7 @@ forwards tcp packets to midi-out
 """
 
 __author__  = "gaul1@lifesim.de"
-__version__ = "0.3"
+__version__ = "0.4"
 
 import sys
 import rtmidi
