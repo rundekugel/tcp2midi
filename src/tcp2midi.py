@@ -25,6 +25,7 @@ class MidiMessage:
   data=[0]
   posWrite = 0
   midiobj = None
+  midiports=[]
   
   # STATUS_4ByteMsg 
   # STATUS_3ByteMsg
@@ -110,7 +111,14 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
           r2= r and r>= midiMsg.msgLen()
           if r2:
             m=midiMsg.popMsg()
-            midiMsg.midiobj.send_message(m)
+            if sys.version_info[1] == 8:
+              m1 = b""
+              for c in m:
+                m1 += chr(c).encode()
+              mm = rtmidi.MidiMessage.createSysExMessage(m1)
+              midiMsg.midiobj.sendMessage(mm)
+            else:
+              midiMsg.midiobj.send_message(m)
             if verbosity >2:
               print("MIDI out: %s"%str(m))
         return
@@ -125,25 +133,33 @@ def usage():
   print("else: -v=n set verbosity to n (0..5)")
 
 def listOfMidiPorts():
-  r=""
-  midiMsg = MidiMessage()
-  midiMsg.midiobj = rtmidi.MidiOut()
-  midiports = midiMsg.midiobj.get_ports()
-  r+="List of Midi Ports:"+os.linesep
+  global midiMsg
+  refreshMidiPorts()
+  r = "List of Midi Ports:"+os.linesep
   n = 0
-  for p in midiports:
-    r+="%d. %s" % (n, p.title()) +os.linesep
+  for p in midiMsg.midiports:
+    r += "%d. %s" % (n, p) +os.linesep
     n += 1
   r+="----"+os.linesep
   return r
+
+def refreshMidiPorts():
+  global midiMsg
+  midiMsg.midiports=[]
+  if sys.version_info[1] == 8:
+    midiMsg.midiobj = rtmidi.RtMidiOut()
+    for i in range(midiMsg.midiobj.getPortCount()):
+      midiMsg.midiports.append(midiMsg.midiobj.getPortName(i))
+  else:
+    midiMsg.midiobj = rtmidi.MidiOut()
+    midiMsg.midiports = midiMsg.midiobj.get_ports()
 
 def main():
     global midiMsg, verbosity
     host,port = "localhost", 9999
 
     midiMsg = MidiMessage()
-    midiMsg.midiobj = rtmidi.MidiOut()
-    midiports = midiMsg.midiobj.get_ports()
+    refreshMidiPorts()
     midiportnum = 0
     verbosity=1
     
@@ -156,24 +172,28 @@ def main():
       return
     try:
       if le >1:
-        midiportnum = int(sys.argv[1])
+        if sys.argv[1][0] != "-":
+          midiportnum = int(sys.argv[1])
       if le >2:
-        port = int(sys.argv[2])
+        if sys.argv[2][0] != "-":
+          port = int(sys.argv[2])
       if le >3:
-        host = sys.argv[3]
+        if sys.argv[3][0] != "-":
+          host = sys.argv[3]
       for p in sys.argv:
-        if p[:3]=="-v=":
+        if p[:3] == "-v=":
           verbosity = int(p[3:])
     except:
+      sys.argv[1]='-p'
+    if sys.argv[1]=="-p":
       print("List of Midi Ports:")
-    #if sys.argv[1]=="-p":
-      n=0
-      for p in midiports:
-        print("%d. %s"%(n, p.title()))
-        n+=1
+      print(listOfMidiPorts())
       print("Call %s with the desired portnumber from the list above."%sys.argv[0])
       return
-    midiMsg.midiobj.open_port(midiportnum)
+    if sys.version_info[1]==8:
+      midiMsg.midiobj.openPort(midiportnum)
+    else:
+      midiMsg.midiobj.open_port(midiportnum)
       
     # Create the server, binding to localhost on port 9999
     if verbosity:
