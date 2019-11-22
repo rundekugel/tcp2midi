@@ -13,8 +13,6 @@ import rtmidi
 import socketserver
 import os
 
-#global 
-#midiout = None
 midiMsg = None
 verbosity = 1
 
@@ -77,8 +75,6 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
     override the handle() method to implement communication to the
     client.
     """
-    # midiMsg = None
-    # midiout = None
     connected = 0
 
     def handle(self):
