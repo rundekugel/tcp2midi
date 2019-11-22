@@ -6,7 +6,7 @@ forwards tcp packets to midi-out
 """
 
 __author__  = "gaul1@lifesim.de"
-__version__ = "0.4"
+__version__ = "0.5"
 
 import sys
 import rtmidi
@@ -100,13 +100,14 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
           if verbosity:
             print("Get MIDI dev. List")
           self.request.sendall(listOfMidiPorts().encode())
+          return
         if verbosity>2:
           print("tcp in: " +str(data))
         for d in data:
           r = midiMsg.feed(d)
-          r2= r and r>= midiMsg.msgLen()
+          r2 = r and r >= midiMsg.msgLen()
           if r2:
-            m=midiMsg.popMsg()
+            m = midiMsg.popMsg()
             if sys.version_info[1] == 8:
               m1 = b""
               for c in m:
