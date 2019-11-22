@@ -11,6 +11,7 @@ __version__ = "0."
 import sys
 import rtmidi
 import time
+import os
 
 midiMsg = None
 
@@ -21,6 +22,7 @@ class MidiMessage:
   data=[0]
   posWrite = 0
   midiobj = None
+  midiports = []
   
   # STATUS_4ByteMsg 
   # STATUS_3ByteMsg
@@ -50,24 +52,53 @@ class MidiMessage:
       return 4
     else:
       return 3
-        
+# end of class
+
+
 def usage():
   print("use with param -p to get list of ports.") 
   print("else: showMidiIn midiport")
 
-def midiInCB(tuple, data):
+def midiInCB(tuple, data=0):
   #print(tuple)
   m=tuple[0]
   print("Status: %02x, Note: %02x, Acc: %02x  # %s"%(
       m[0], m[1], m[2], str(tuple)))
 
-def main():
-    # global  midiMsg
-    # midiMsg = MidiMessage()
+def midiInCB1(msg):
+  #print(msg)
+  #print(msg.getChannel())
+  m=msg.getRawData()
+  #print(m)
+  print("Status: %02x, Note: %02x, Acc: %02x  # %s"%(
+      m[0], m[1], m[2], str(msg)))
 
-    midiobj = rtmidi.MidiIn()
-    midiports =midiobj.get_ports()
+def listOfMidiPorts():
+  global midiMsg
+  refreshMidiPorts()
+  r = "List of Midi Ports:"+os.linesep
+  n = 0
+  for p in midiMsg.midiports:
+    r += "%d. %s" % (n, p) +os.linesep
+    n += 1
+  r+="----"+os.linesep
+  return r
+
+def refreshMidiPorts():
+  global midiMsg
+  midiMsg = MidiMessage()
+  midiMsg.midiports=[]
+  if sys.version_info[1] == 8:
+    midiMsg.midiobj = rtmidi.RtMidiIn()
+    for i in range(midiMsg.midiobj.getPortCount()):
+      midiMsg.midiports.append(midiMsg.midiobj.getPortName(i))
+  else:
+    midiMsg.midiobj = rtmidi.MidiIn()
+    midiMsg.midiports = midiMsg.midiobj.get_ports()
+
+def main():
     midiportnum = 0
+    refreshMidiPorts()
     
     le=len(sys.argv)
     if le <=1:
@@ -77,16 +108,17 @@ def main():
       if le >1:
         midiportnum = int(sys.argv[1])
     except:
-      print("List of Midi Ports:")
-    #if sys.argv[1]=="-p":
-      n=0
-      for p in midiports:
-        print("%d. %s"%(n, p.title()))
-        n+=1
+      sys.argv[1] = "-p"
+    if sys.argv[1]=="-p":
+      print(listOfMidiPorts())
       print("Call %s with the desired portnumber from the list above."%sys.argv[0])
       return
-    midiobj.open_port(midiportnum)
-    midiobj.set_callback(midiInCB, 0)
+    if sys.version_info[1]==8:
+      midiMsg.midiobj.openPort(midiportnum)
+      midiMsg.midiobj.setCallback(midiInCB1)
+    else:
+      midiMsg.midiobj.open_port(midiportnum)
+      midiMsg.midiobj.set_callback(midiInCB, 0)
     while 1:
       time.sleep(0.1)
 
